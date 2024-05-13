@@ -1,0 +1,14 @@
+*.sw?
+obj
+*.log
+_x
+.run
+.ipcache
+/tmp_*
+/packaged_*
+*.jou
+*.tgz
+/xclbin
+/emconfig.json
+/reports
+/hw

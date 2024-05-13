@@ -1,0 +1,169 @@
+import FIFO::*;
+import Vector::*;
+
+typedef 2 MemPortCnt;
+
+interface MemPortIfc;
+	method ActionValue#(MemPortReq) readReq;
+	method ActionValue#(MemPortReq) writeReq;
+	method ActionValue#(Bit#(512)) writeWord;
+	method Action readWord(Bit#(512) word);
+endinterface
+
+interface KernelMainIfc;
+	method Action start(Bit#(32) param);
+	method Bool done;
+	interface Vector#(MemPortCnt, MemPortIfc) mem;
+endinterface
+
+typedef struct {
+	Bit#(64) addr;
+	Bit#(32) bytes;
+} MemPortReq deriving (Eq,Bits);
+
+
+module mkKernelMain(KernelMainIfc);
+	Vector#(MemPortCnt, FIFO#(MemPortReq)) readReqQs <- replicateM(mkFIFO);
+	Vector#(MemPortCnt, FIFO#(MemPortReq)) writeReqQs <- replicateM(mkFIFO);
+	Vector#(MemPortCnt, FIFO#(Bit#(512))) writeWordQs <- replicateM(mkFIFO);
+	Vector#(MemPortCnt, FIFO#(Bit#(512))) readWordQs <- replicateM(mkFIFO);
+	Reg#(Bit#(32)) cycleCounter <- mkReg(0);
+	Reg#(Bool) started <- mkReg(False);
+	Reg#(Bit#(32)) bytesToRead <- mkReg(0);
+	rule incCycle;
+		cycleCounter <= cycleCounter + 1;
+	endrule
+
+	//////////////////////////////////////////////////////////////////////////
+	Reg#(Bit#(32)) readReqOff <- mkReg(0);
+	rule sendReadReq (bytesToRead > 0);
+		if ( bytesToRead > 64 ) bytesToRead <= bytesToRead - 64;
+		else bytesToRead <= 0;
+
+		readReqQs[0].enq(MemPortReq{addr:zeroExtend(readReqOff), bytes:64});
+		readReqOff <= readReqOff+ 64;
+	endrule
+	Reg#(Bit#(512)) serializerBuff <- mkReg(0);
+	Reg#(Bit#(2)) serializerCouter <- mkReg(0);
+	Vector#(16,FIFO#(Vector#(16,Bit#(8)))) compactionQs <- replicateM(mkFIFO);
+	//FIFO#(Bit#(128)) serialInQ <- mkFIFO;
+	rule recvReadResp;
+		if ( serializerCouter == 0 ) begin
+			let d = readWordQs[0].first;
+			readWordQs[0].deq;
+			compactionQs[0].enq(unpack(truncate(d)));
+			serializerBuff <= (d>>128);
+			serializerCouter <= 3;
+		end else begin
+			serializerCouter <= serializerCouter - 1;
+			serializerBuff <= (serializerBuff>>128);
+			compactionQs[0].enq(unpack(truncate(serializerBuff)));
+		end
+	endrule
+
+	for ( Integer i = 1; i < 16; i = i+ 1 ) begin
+		rule compact;
+			Vector#(16, Bit#(8)) nv = ?;
+			Vector#(16, Bit#(8)) iv = compactionQs[i-1].first;
+			compactionQs[i-1].deq;
+
+			for ( Integer j = 0; j < 15; j = j+1 ) begin
+				// wrong
+				if ( iv[j] <33 || iv[j] >126 ) begin // not character
+					nv[j] = iv[j+1];
+					nv[j+1] = 0;// iv[j];
+				end else begin
+					nv[j] = iv[j];
+					nv[j+1] = iv[j+1];
+				end
+			end
+
+			compactionQs[i].enq(nv);
+		endrule
+	end
+
+	FIFO#(Bit#(128)) alignedQ <- mkFIFO;
+	FIFO#(Bit#(4)) cntQ <- mkFIFO;
+	rule countCompacted;
+		let d = compactionQs[15].first;
+		compactionQs[15].deq;
+		Bit#(4) cnt = 0;
+		Bit#(16) bitmap = 0;
+		for (Integer i = 0; i < 16; i=i+1 ) begin
+			if ( d[i] > 0 ) bitmap[i] = 1;
+		end
+
+		if ( (bitmap & 16'hff00) > 0) cnt = cnt+8;
+		if ( (bitmap & 16'hf0f0) > 0) cnt = cnt+4;
+		if ( (bitmap & 16'h3333) > 0) cnt = cnt+2;
+		if ( (bitmap & 16'h5555) > 0) cnt = cnt+1;
+
+		alignedQ.enq(pack(d));
+		cntQ.enq(cnt);
+	endrule
+
+	Reg#(Bit#(5)) curConcatOff <- mkReg(0);
+	Reg#(Bit#(256)) curConcatBuf <- mkReg(0);
+	FIFO#(Bit!(128)) concatQ <- mkFIFO;
+	rule concatCompat;
+		alignedQ.deq;
+		cntQ.deq;
+
+		let d = alignedQ.first;
+		let cnt = cntQ.first;
+
+
+		Bit#(256) tempCon = curConcatBuf | (d<<(8*cnt));
+		Bit#(5) zoff = zeroExtend(cnt);
+		if ( zoff + curConcatOff >= 16 ) begin
+			concatQ.enq(truncate(tempCon));
+			curConcatBuf <= (tempCon>>128);
+			curConcatOff <= zoff+curConcatOff-16;
+		end else begin
+			curConcatBuf <= tempCon;
+			curConcatOff <= zoff + curConcatOff;
+		end
+		
+	endrule
+
+
+	
+	
+
+	//////////////////////////////////////////////////////////////////////////
+
+
+
+
+	Reg#(Bool) kernelDone <- mkReg(False);
+	
+	Vector#(MemPortCnt, MemPortIfc) mem_;
+	for (Integer i = 0; i < valueOf(MemPortCnt); i=i+1) begin
+		mem_[i] = interface MemPortIfc;
+			method ActionValue#(MemPortReq) readReq;
+				readReqQs[i].deq;
+				return readReqQs[i].first;
+			endmethod
+			method ActionValue#(MemPortReq) writeReq;
+				writeReqQs[i].deq;
+				return writeReqQs[i].first;
+			endmethod
+			method ActionValue#(Bit#(512)) writeWord;
+				writeWordQs[i].deq;
+				return writeWordQs[i].first;
+			endmethod
+			method Action readWord(Bit#(512) word);
+				readWordQs[i].enq(word);
+			endmethod
+		endinterface;
+	end
+	method Action start(Bit#(32) param);
+		started <= True;
+		bytesToRead <= param;
+	endmethod
+	method Bool done;
+		return kernelDone;
+	endmethod
+	interface mem = mem_;
+endmodule
+
