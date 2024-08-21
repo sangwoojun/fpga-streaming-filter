@@ -46,6 +46,7 @@ StreamInterface::send(void* ptr, int32_t bytes) {
 		bool ret = this->flush();
 		if ( !ret ) return -1; // flush failed (probably because there was no receive buffer space)
 	}
+    // Copy to m_inBufHost ** in **
 	memcpy(((uint8_t*)(m_inBufHost[m_curInQueue])) + m_curInByteOff, ptr, bytes); //FIXME no safety!
 	m_curInByteOff += bytes;
 	return bytes;
@@ -61,26 +62,29 @@ StreamInterface::flush() {
 		bufstate = BUF_USEREADY;
 		m_outQueueState[m_curInQueue] = bufstate;
 
-
-
 		int32_t* obuf = (int32_t*)(m_outBufHost[m_curInQueue]);
 		int32_t bufbytes = obuf[0];
 		printf( "Received buffer %d bytes %d - %d\n", bufbytes, m_curInQueue, obuf[16] ); fflush(stdout);
 		//raise(SIGINT);
 		m_totalRecvBytes += bufbytes;
 	}
+
 	// user needs to read out buffer first
-	if ( !(bufstate == BUF_INIT || bufstate == BUF_USEDONE) ) return false;
+	if ( !(bufstate == BUF_INIT || bufstate == BUF_USEDONE) ) {
+        printf( "Need to read output buffer!\n");
+        return false;
+    }
 
 
 	xrt::run& grun = m_kernelRun[m_curInQueue];
 
 	grun = xrt::run(m_kernel);
-	grun.set_arg(0, m_inBufDev[m_curInQueue]);
-	grun.set_arg(1, m_outBufDev[m_curInQueue]);
-	grun.set_arg(2,0);// m_curInQueue<<(BUFFER_BYTES_LG-2));
-	grun.set_arg(3,0);// m_curInQueue<<(BUFFER_BYTES_LG-2));
-	grun.set_arg(4, m_curInByteOff);
+    /// Need to fix
+	/* grun.set_arg(0, m_inBufDev[m_curInQueue]);
+	 * grun.set_arg(1, m_outBufDev[m_curInQueue]); */
+	grun.set_arg(0, m_curInByteOff);
+	grun.set_arg(1,0);// m_curInQueue<<(BUFFER_BYTES_LG-2));
+	grun.set_arg(2, 0);
     
 	//std::fill((uint8_t*)(m_outBufHost[m_curInQueue]),(uint8_t*)(m_outBufHost[m_curInQueue]) + BUFFER_BYTES, 0);
 
