@@ -36,6 +36,8 @@ module mkKernelMain(KernelMainIfc);
 	Reg#(Bool) started <- mkReg(False);
 	Reg#(Bit#(32)) bytesToRead <- mkReg(0);
 
+	FIFO#(Bit#(512)) resultQ <-mkFIFO;
+
 	rule incCycle;
 		cycleCounter <= cycleCounter + 1;
 	endrule
@@ -52,14 +54,26 @@ module mkKernelMain(KernelMainIfc);
 		readReqOff <= readReqOff+ 64;
 	endrule
 
-	rule writeResult;
+    // This is a simple calculation for testing
+	rule addNumber;
 		let d = readWordQs[0].first;
 		readWordQs[0].deq;
 
+		d[63:32] = bytesToRead;
+		d = d + 7;
+
+		resultQ.enq(d);
+	endrule
+
+	rule writeResult;
+	    let d = resultQ.first;
+	    resultQ.deq;
+
 		writeReqQs[1].enq(MemPortReq{addr:writeReqOff, bytes:64});
 		writeReqOff <= writeReqOff + 64;
-		writeWordQs[1].enq(d * 2);
+		writeWordQs[1].enq(d);
 	endrule
+
 	//////////////////////////////////////////////////////////////////////////
 
 	Reg#(Bool) kernelDone <- mkReg(False);
@@ -90,7 +104,11 @@ module mkKernelMain(KernelMainIfc);
 		bytesToRead <= param;
 	endmethod
 	method Bool done;
-		return kernelDone;
+	    if (writeReqOff != 0 && readReqOff == writeReqOff) begin
+	        return True;
+	    end else begin
+	        return False;
+	    end
 	endmethod
 	interface mem = mem_;
 endmodule
