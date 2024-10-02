@@ -12,7 +12,7 @@ all: $(wildcard *)
 
 swsim: $(wildcard *) $(KERNEL_DIR)/kernel.cpp
 	mkdir -p $(BUILD_DIR)
-	g++ $(CXXFLAGS) host.cpp StreamInterfaceSw.cpp $(KERNEL_DIR)/kernel.cpp -o $(BUILD_DIR)/app.exe -I${XILINX_XRT}/include/ -L$(XILINX_XRT)/lib -lxrt_coreutil -pthread
+	g++ $(CXXFLAGS) host.cpp StreamInterfaceSw.cpp $(KERNEL_DIR)/kernel.cpp -o $(BUILD_DIR)/app.exe -pthread
 
 
 clean:
