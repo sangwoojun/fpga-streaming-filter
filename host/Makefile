@@ -16,4 +16,4 @@ swsim: $(wildcard *) $(KERNEL_DIR)/kernel.cpp
 
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)/app.exe

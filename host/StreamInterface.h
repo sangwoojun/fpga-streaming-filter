@@ -8,7 +8,10 @@
 #include <experimental/xrt_xclbin.h>
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
+
+/* #include<experimental/xrt_enqueue.h> */
 #include <experimental/xrt_queue.h>
+/* #include "xrt_queue.h" */
 
 #endif
 
@@ -21,6 +24,7 @@
 // 8MB is kind of random, hopefully large enough
 #define BUFFER_BYTES_LG 12
 #define BUFFER_BYTES (1<<BUFFER_BYTES_LG)
+/* #define XRT_QUEUE_CNT 4 */
 #define XRT_QUEUE_CNT 4
 
 typedef enum {
