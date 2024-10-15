@@ -1,6 +1,7 @@
 import Axi4LiteControllerXrt::*;
 import Axi4MemoryMaster::*;
 
+import FIFO::*;
 import Vector::*;
 import Clocks :: *;
 
@@ -36,17 +37,32 @@ module kernel (KernelTopIfc);
 
 	KernelMainIfc kernelMain <- mkKernelMain;
 
-	// Check Started if AXI controller is ready
-	rule checkStart (!started);
-		if ( axi4control.ap_start ) begin
-			kernelMain.start(axi4control.scalar00);
-			started <= True;
+	rule assertControl;
+		if ( !started ) begin
+			axi4control.ap_ready;
+			axi4control.ap_idle;
 		end
 	endrule
 
+	// Check Started if AXI controller is ready
+	FIFO#(Bit#(32)) startQ <- mkFIFO;
+	rule checkStart; 
+		if ( axi4control.ap_start ) begin
+			startQ.enq(axi4control.scalar00);
+		end
+	endrule
+	rule relayStart (!started);
+		startQ.deq;
+		kernelMain.start(startQ.first);
+		started <= True;
+	endrule
+
 	rule checkDone ( started );
-		Bool done = kernelMain.done;
-		if ( done ) axi4control.ap_done();
+		Bool done <- kernelMain.done;
+		if ( done ) begin
+			axi4control.ap_done();
+			started <= False;
+		end
 	endrule
 	for ( Integer i = 0; i < valueOf(MemPortCnt); i=i+1 ) begin
 		rule relayReadReq00 ( started);

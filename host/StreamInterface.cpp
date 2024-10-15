@@ -19,7 +19,7 @@ StreamInterface::StreamInterface() {
     auto uuid = device.load_xclbin(binaryFile);
 
     // Create the kernel object
-    m_kernel = xrt::kernel(device, uuid, "kernel", xrt::kernel::cu_access_mode::exclusive);
+    m_kernel = xrt::kernel(device, uuid, "kernel:{kernel_1}");//, xrt::kernel::cu_access_mode::exclusive);
 
     
     std::cout << "Buffer matching " << binaryFile << std::endl;
@@ -96,25 +96,30 @@ StreamInterface::flush() {
     for (int i = 0; i < 24; ++i) {
         printf("%d ", obuf[i]);
     }
+	fflush(stdout);
 
 	int send_bytes = m_curInByteOff;
 	xrt::queue::event sync_send = m_asyncQueue[m_curInQueue].enqueue([&bh, send_bytes] { 
 		bh.sync(XCL_BO_SYNC_BO_TO_DEVICE, send_bytes, 0); 
 	});
+	sync_send.wait();
+	printf( "Buffer send done\n" ); fflush(stdout);
 	xrt::queue::event run_kernel = m_asyncQueue[m_curInQueue].enqueue([&grun] {
 		grun.start();
-        grun.wait();
+        //grun.wait();
 	});
+	run_kernel.wait();
+	printf( "Kernel done\n" ); fflush(stdout);
 
     this->m_writeBackEventQueue[m_curInQueue] = m_asyncQueue[m_curInQueue].enqueue([&bd, send_bytes] {
             bd.sync(XCL_BO_SYNC_BO_FROM_DEVICE, send_bytes, 0); 
             });
 
-	printf( "Sent buffer\n" ); fflush(stdout);
 
     m_writeBackEventQueue[m_curInQueue].wait();
+	//printf( "Sent buffer\n" ); fflush(stdout);
 
-    printf("Wait Done! \n");
+    printf("Buffer recv! \n");
 	
 	m_outQueueState[m_curInQueue] = BUF_INFLIGHT;
 
@@ -139,13 +144,19 @@ StreamInterface::recv(void* ptr, int32_t bytes) {
         m_curOutByteOff = 0; // first 512 bits are header
 	}
 
+	printf( "Recv state 1\n" );
+
 	if ( m_outQueueState[m_curOutQueue] == BUF_INFLIGHT ) {
         this->m_writeBackEventQueue[m_curOutQueue].wait();
 		m_outQueueState[m_curOutQueue] = BUF_USEREADY;
+	
+		printf( "Recv state 2\n" );
 
 		m_totalRecvBytes += bufbytes;
 	}
     if ( m_outQueueState[m_curOutQueue] != BUF_USEREADY ) return -1;
+		
+	printf( "Recv state 3\n" );
 
 	memcpy(ptr, (uint8_t*)(m_outBufHost[m_curOutQueue]) + m_curOutByteOff, bytes);
 

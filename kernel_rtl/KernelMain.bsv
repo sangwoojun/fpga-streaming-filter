@@ -1,4 +1,5 @@
 import FIFO::*;
+import FIFOF::*;
 import Vector::*;
 
 typedef 2 MemPortCnt;
@@ -12,7 +13,7 @@ endinterface
 
 interface KernelMainIfc;
 	method Action start(Bit#(32) param);
-	method Bool done;
+	method ActionValue#(Bool) done;
 	interface Vector#(MemPortCnt, MemPortIfc) mem;
 endinterface
 
@@ -35,8 +36,11 @@ module mkKernelMain(KernelMainIfc);
 	Reg#(Bit#(32)) cycleCounter <- mkReg(0);
 	Reg#(Bool) started <- mkReg(False);
 	Reg#(Bit#(32)) bytesToRead <- mkReg(0);
+	Reg#(Bit#(32)) bytesReq <- mkReg(0);
 
 	FIFO#(Bit#(512)) resultQ <-mkFIFO;
+	FIFOF#(Bool) doneQ <- mkFIFOF;
+
 
 	rule incCycle;
 		cycleCounter <= cycleCounter + 1;
@@ -73,6 +77,15 @@ module mkKernelMain(KernelMainIfc);
 		writeReqOff <= writeReqOff + 64;
 		writeWordQs[1].enq(d);
 	endrule
+	
+	rule checkDone;
+	    //if (writeReqOff != 0 && readReqOff == writeReqOff) begin
+	    if (writeReqOff != 0 && zeroExtend(bytesReq) == writeReqOff) begin
+			doneQ.enq(True);
+			bytesReq <= 0;
+			started <= False;
+	    end
+	endrule
 
 	//////////////////////////////////////////////////////////////////////////
 
@@ -102,13 +115,11 @@ module mkKernelMain(KernelMainIfc);
 	method Action start(Bit#(32) param);
 		started <= True;
 		bytesToRead <= param;
+		bytesReq <= param;
 	endmethod
-	method Bool done;
-	    if (writeReqOff != 0 && readReqOff == writeReqOff) begin
-	        return True;
-	    end else begin
-	        return False;
-	    end
+	method ActionValue#(Bool) done;
+		doneQ.deq;
+		return doneQ.first;
 	endmethod
 	interface mem = mem_;
 endmodule

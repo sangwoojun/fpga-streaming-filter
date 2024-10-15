@@ -7,7 +7,7 @@ BUILD_DIR := $(TARGET)
 CXXFLAGS += -g -std=c++17 -Wall -O2
 
 JOBS := 8
-VPPFLAGS := --vivado.param general.maxThreads=8 --vivado.impl.jobs 8 --vivado.synth.jobs 8
+VPPFLAGS := --vivado.param general.maxThreads=8 --vivado.impl.jobs 8 --vivado.synth.jobs 8 --temp_dir $(BUILD_DIR) --log_dir $(BUILD_DIR) --report_dir $(BUILD_DIR)
 
 #run: build
 #ifeq ($(TARGET),hw)
@@ -28,9 +28,9 @@ $(BUILD_DIR)/app.exe: $(HOSTDIR)/$(wildcard *.cpp) $(HOSTDIR)/$(wildcard *.h)
 
 ## TODO xo files should be created by individual Makefiles in each kernel directory
 xo: $(BUILD_DIR)/kernel.xo
-$(BUILD_DIR)/kernel.xo:
+$(BUILD_DIR)/kernel.xo: $(KERNELDIR)/$(wildcard *.bsv) $(KERNELDIR)/$(wildcard *.v)
 ifeq ($(TARGET),sw_emu)
-	v++ -c -t ${TARGET} --platform $(PLATFORM) --config $(CONFIGDIR)/u50.cfg -k kernel -I$(KERNELDIR) $(KERNELDIR)/*.cpp -o $(BUILD_DIR)/kernel.xo $(VPPFLAGS)
+	v++ -c -t ${TARGET} --platform $(PLATFORM) --config $(CONFIGDIR)/u50.cfg -k kernel $(VPPFLAGS) -I$(KERNELDIR) $(KERNELDIR)/*.cpp -o $(BUILD_DIR)/kernel.xo
 else
 	#v++ -c --mode hls --platform $(PLATFORM) --config $(KERNELDIR)/hls_config.cfg --work_dir $(BUILD_DIR) $(VPPFLAGS)
 	$(MAKE) -C $(KERNELDIR)

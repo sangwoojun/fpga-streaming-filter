@@ -14,9 +14,9 @@ all: verilog obj/kernel.xo
 
 obj/kernel.xo: ./kernel.xml ./scripts/package_kernel.tcl ./scripts/gen_xo.tcl $(wildcard ./obj/verilog/*.v) verilog
 	mkdir -p obj
-	$(VIVADO) -mode batch -source scripts/gen_xo.tcl -tclargs $(BUILD_DIR)/kernel.xo kernel hw $(PLATFORM)
+	$(VIVADO) -mode batch -tempDir obj -source scripts/gen_xo.tcl -tclargs $(BUILD_DIR)/kernel.xo kernel hw $(PLATFORM)
 
-verilog: $(wildcard *.bsv)
+verilog: $(wildcard *.bsv) $(wildcard *.v)
 	mkdir -p obj
 	mkdir -p obj/verilog
 	bsc  $(BSCFLAGS) $(BSCFLAGS_SYNTH) -remove-dollar -p +:$(MODULEPATH) -verilog -u -g kernel KernelTop.bsv 
