@@ -25,12 +25,12 @@ StreamInterface::StreamInterface() {
     std::cout << "Buffer matching " << binaryFile << std::endl;
     // Allocate input and output buffers
 	for ( int i = 0; i < XRT_QUEUE_CNT; i++ ) {
-		m_inBufDev[i] = xrt::bo(device, BUFFER_BYTES, m_kernel.group_id(1)); 
-		m_outBufDev[i] = xrt::bo(device, BUFFER_BYTES, m_kernel.group_id(2));
+		m_inBufDev[i] = xrt::bo(device, BUFFER_BYTES*2, m_kernel.group_id(1)); 
+		m_outBufDev[i] = xrt::bo(device, BUFFER_BYTES*2, m_kernel.group_id(2));
 		m_inBufHost[i] = m_inBufDev[i].map();
 		m_outBufHost[i] = m_outBufDev[i].map();
-		std::fill((uint8_t*)m_inBufHost[i], (uint8_t*)m_inBufHost[i] + (BUFFER_BYTES), 0);
-		std::fill((uint8_t*)m_outBufHost[i],(uint8_t*)m_outBufHost[i] + (BUFFER_BYTES), 0);
+		std::fill((uint8_t*)m_inBufHost[i], (uint8_t*)m_inBufHost[i] + (BUFFER_BYTES*2), 0);
+		std::fill((uint8_t*)m_outBufHost[i],(uint8_t*)m_outBufHost[i] + (BUFFER_BYTES*2), 0);
 	}
 
 	m_curInQueue = 0;
@@ -144,19 +144,19 @@ StreamInterface::recv(void* ptr, int32_t bytes) {
         m_curOutByteOff = 0; // first 512 bits are header
 	}
 
-	printf( "Recv state 1\n" );
+	//printf( "Recv state 1\n" );
 
 	if ( m_outQueueState[m_curOutQueue] == BUF_INFLIGHT ) {
         this->m_writeBackEventQueue[m_curOutQueue].wait();
 		m_outQueueState[m_curOutQueue] = BUF_USEREADY;
 	
-		printf( "Recv state 2\n" );
+		//printf( "Recv state 2\n" );
 
 		m_totalRecvBytes += bufbytes;
 	}
     if ( m_outQueueState[m_curOutQueue] != BUF_USEREADY ) return -1;
 		
-	printf( "Recv state 3\n" );
+	//printf( "Recv state 3\n" );
 
 	memcpy(ptr, (uint8_t*)(m_outBufHost[m_curOutQueue]) + m_curOutByteOff, bytes);
 

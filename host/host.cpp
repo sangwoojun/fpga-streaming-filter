@@ -25,10 +25,10 @@ int main(int argc, char** argv) {
 	for ( int i = 0; i < (32*1024); i++ ) {
 		uint32_t nd = rand()%256;
 		while ( ifc->send(&nd, sizeof(uint32_t)) < 0 ) {
-			printf( "Trying receive\n" );
+			//printf( "Trying receive\n" );
 			uint32_t dd = 0;
 			while ( ifc->recv(&dd, sizeof(uint32_t)) > 0 ) {
-				printf( "Received\n" );
+				//printf( "Received\n" );
 				cnt++;
 			}
 		}

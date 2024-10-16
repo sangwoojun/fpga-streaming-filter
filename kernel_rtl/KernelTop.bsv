@@ -39,17 +39,18 @@ module kernel (KernelTopIfc);
 
 	rule assertControl;
 		if ( !started ) begin
-			axi4control.ap_ready;
 			axi4control.ap_idle;
 		end
 	endrule
 
 	// Check Started if AXI controller is ready
 	FIFO#(Bit#(32)) startQ <- mkFIFO;
+	Reg#(Bool) last_ap_start <- mkReg(False);
 	rule checkStart; 
-		if ( axi4control.ap_start ) begin
+		if ( !last_ap_start && axi4control.ap_start ) begin
 			startQ.enq(axi4control.scalar00);
 		end
+		last_ap_start <= axi4control.ap_start;
 	endrule
 	rule relayStart (!started);
 		startQ.deq;
@@ -61,6 +62,7 @@ module kernel (KernelTopIfc);
 		Bool done <- kernelMain.done;
 		if ( done ) begin
 			axi4control.ap_done();
+			axi4control.ap_ready;
 			started <= False;
 		end
 	endrule

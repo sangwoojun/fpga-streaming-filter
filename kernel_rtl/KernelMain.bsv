@@ -78,7 +78,7 @@ module mkKernelMain(KernelMainIfc);
 		writeWordQs[1].enq(d);
 	endrule
 	
-	rule checkDone;
+	rule checkDone (started);
 	    //if (writeReqOff != 0 && readReqOff == writeReqOff) begin
 	    if (writeReqOff != 0 && zeroExtend(bytesReq) == writeReqOff) begin
 			doneQ.enq(True);
@@ -112,10 +112,12 @@ module mkKernelMain(KernelMainIfc);
 		endinterface;
 	end
 
-	method Action start(Bit#(32) param);
+	method Action start(Bit#(32) param) if ( !started );
 		started <= True;
 		bytesToRead <= param;
 		bytesReq <= param;
+		writeReqOff <= 0;
+		readReqOff <= 0;
 	endmethod
 	method ActionValue#(Bool) done;
 		doneQ.deq;

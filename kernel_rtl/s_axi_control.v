@@ -289,16 +289,21 @@ always @(posedge ACLK) begin
     if (ARESET)
         int_ap_idle <= 1'b0;
     else if (ACLK_EN) begin
-            int_ap_idle <= ap_idle;
+		int_ap_idle <= ap_idle;
     end
 end
+
+
 
 // int_ap_ready
 always @(posedge ACLK) begin
     if (ARESET)
         int_ap_ready <= 1'b0;
     else if (ACLK_EN) begin
-            int_ap_ready <= ap_ready;
+		if (ap_ready)
+			int_ap_ready <= 1'b1;
+		else if (ar_hs && raddr == ADDR_AP_CTRL)
+			int_ap_ready <= 1'b0; // clear on read
     end
 end
 
