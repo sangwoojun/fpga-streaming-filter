@@ -25,12 +25,12 @@ StreamInterface::StreamInterface() {
     std::cout << "Buffer matching " << binaryFile << std::endl;
     // Allocate input and output buffers
 	for ( int i = 0; i < XRT_QUEUE_CNT; i++ ) {
-		m_inBufDev[i] = xrt::bo(device, BUFFER_BYTES*2, m_kernel.group_id(1)); 
-		m_outBufDev[i] = xrt::bo(device, BUFFER_BYTES*2, m_kernel.group_id(2));
+		m_inBufDev[i] = xrt::bo(device, BUFFER_BYTES, m_kernel.group_id(1)); 
+		m_outBufDev[i] = xrt::bo(device, BUFFER_BYTES, m_kernel.group_id(2));
 		m_inBufHost[i] = m_inBufDev[i].map();
 		m_outBufHost[i] = m_outBufDev[i].map();
-		std::fill((uint8_t*)m_inBufHost[i], (uint8_t*)m_inBufHost[i] + (BUFFER_BYTES*2), 0);
-		std::fill((uint8_t*)m_outBufHost[i],(uint8_t*)m_outBufHost[i] + (BUFFER_BYTES*2), 0);
+		std::fill((uint8_t*)m_inBufHost[i], (uint8_t*)m_inBufHost[i] + (BUFFER_BYTES), 0);
+		std::fill((uint8_t*)m_outBufHost[i],(uint8_t*)m_outBufHost[i] + (BUFFER_BYTES), 0);
 	}
 
 	m_curInQueue = 0;
